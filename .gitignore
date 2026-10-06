@@ -1,0 +1,7 @@
+# Operating-system generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Office lock/temp files created while a .docx is open
+~$*
