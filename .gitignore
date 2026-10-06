@@ -5,3 +5,6 @@ desktop.ini
 
 # Office lock/temp files created while a .docx is open
 ~$*
+
+# Python bytecode cache created when running tests
+__pycache__/
