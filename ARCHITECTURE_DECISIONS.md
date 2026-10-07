@@ -309,3 +309,53 @@ Date: 2026-10-07. **Frozen contracts remain unchanged; their underlying open ite
   - The telemetry does not expose the solar rate, so only the net battery energy change can be derived, not gross consumption.
   - Machine State is not used: no implemented calculation needs it. No state is assumed to imply any energy level (for example idle is not treated as inefficient, and off is not treated as zero energy). Utilization and idle or startup energy attribution are deferred, because their definitions are not established.
 - **REMAINING OPEN CONTRACT ITEMS:** W-8 (what telemetry a `status` message carries) remains open and unaffected.
+
+## Baseline Decisions: Descriptive Baseline V1 (BL-1 to BL-8)
+
+Date: 2026-10-07. **Frozen contracts remain unchanged; their underlying open items remain open.** Nothing here resolves a frozen open item. `BL-1` to `BL-8` follow the same numbering approach as `MD-n`, `MR-n`, `ST-n`, `MS-n` and `EN-n` and are not contract IDs. All eight are owner-approved implementation decisions (Accepted). The implementation is `baseline/baseline.py`.
+
+**Source-supported facts used.** The frozen sources define no baseline. The canonical Record carries the nine numeric readings and the five sensor-status flags (MD-3, MD-4). A sensor flagged "fault" may carry null or a numeric value (MD-4). Storage history order is the storage row id; record time and `sequence_number` are not used for ordering (ST-2). Storage reads do not revalidate Records, and a corrupt row raises `StorageCorruptionError` (ST-3). The Record carries no machine state, position, activity mode, battery percentage, light, or any machine electrical or production measurement.
+
+**Frozen ambiguities that stay unresolved.** R-2 (time source and format), R-3 (sequence-number semantics), R-4 (unique ID construction), R-6 (version provenance) and R-13 (which readings are included, and units). The baseline avoids depending on them: it never parses `time`, never uses `sequence_number`, reports no unit, and records no version context.
+
+### BL-1: Scope
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the baseline is descriptive only. It produces descriptive statistics for supplied historical observations and does not claim normal, healthy or unhealthy behaviour, anomaly, failure, predictive capability, maintenance requirement, confidence or machine health. It has no anomaly, confidence, health or alert field. Rolling and EWMA statistics, control limits, z-scores, percentile thresholds, trend and change-point detection are later milestones.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved.
+
+### BL-2: Signals and caveats
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** exactly nine signal paths are supported: `soil.nitrogen`, `soil.phosphorus`, `soil.potassium`, `soil.moisture`, `soil.temperature`, `air.temperature`, `air.humidity`, `air.pressure`, `battery.voltage_v`. Any other signal is rejected. The unit in the result is `None` because units are unresolved (R-13). The five soil signals carry a machine-readable caveat that mock values may reflect spatial sampling variation because the Mock Rover soil field varies with position while position is not in the Record. `battery.voltage_v` carries a caveat that the mock battery voltage trends with battery usage and is not a stationary machine-health baseline. The caveats are descriptive context, not judgments.
+- **REMAINING OPEN CONTRACT ITEMS:** R-13 remains open.
+
+### BL-3: Grouping
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** grouping is by `rover_id` and signal only. There is no grouping by machine state, position, load, production, shift, time of day, environmental regime or operating mode, and none is inferred. The result context states that machine state is unavailable.
+
+### BL-4: Input window
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the caller supplies an ordered sequence of Records or StoredRecord-like items (`id`, `record`). The baseline processes them in the supplied order and never sorts, never parses `time`, never uses `sequence_number`, and never queries or modifies Storage. Duplicates are separate observations. Storage ids are used only as boundary metadata (`first_id`, `last_id`), and are `None` when the supplied items carry none.
+- **REMAINING OPEN CONTRACT ITEMS:** R-2, R-3 and R-4 remain open.
+
+### BL-5: Minimum history
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the caller must supply `min_count`; there is no default. It must be an integer (not a bool) of at least 2; the floor exists only because sample standard deviation needs two observations, not as a scientific sample size. With fewer included observations than `min_count` the status is "insufficient" and mean, median, minimum, maximum and std are `None`; otherwise the status is "sufficient".
+
+### BL-6: Exclusion rules
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:**
+  - An observation is included only when its Record belongs to the requested rover, passes the Record Core validator, the selected reading is a finite number, and the covering sensor status is "ok".
+  - Everything else is excluded and counted under `null_reading`, `sensor_fault`, `invalid_record`, `non_finite_or_non_numeric` or `wrong_rover`.
+  - A sensor fault always excludes the observation, including a faulted numeric value. `sensor_status.npk` covers nitrogen, phosphorus and potassium.
+  - Values are never imputed. There is no fault-rate threshold.
+  - A Record that fails validation only because of the selected reading is counted by that reason (`non_finite_or_non_numeric` for a non-numeric or non-finite value, `null_reading` for "ok" with null, `sensor_fault` when the covering flag is "fault"); any other validation failure is `invalid_record`. The rover check precedes validation.
+  - `StorageCorruptionError` raised while the caller reads history is not caught or hidden by the baseline.
+
+### BL-7: Statistics
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** exactly count, mean, median, minimum, maximum and sample standard deviation (n - 1), using the standard library.
+
+### BL-8: Package design
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the package is `baseline/` (module `baseline/baseline.py`), Python standard library plus the existing Record Core validator. The result is a frozen dataclass with the approved fields only. The code is pure, deterministic, non-mutating and independent of wall-clock time, randomness, network, files, database, hardware and providers. Record Core, Mock Rover, Storage, Machine State, Energy and calibration are unchanged.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
