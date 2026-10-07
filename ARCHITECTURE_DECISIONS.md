@@ -197,3 +197,40 @@ These decisions do not resolve them: R-1, R-2, R-3, R-4, R-6, R-7, R-8, R-9, R-1
   - BH1750 light remains simulator telemetry only and is not added to the canonical Record Core.
   - A measurement, a camera movement and a camera capture each consume simulated time and use the simulator's testing-mode battery drain. These are simulator behaviors, not physical performance claims.
 - **Still open:** R-7, R-13.
+
+## Storage Decisions: Prototype Historical Record Store (ST-1 to ST-3)
+
+**Status of all three entries: Accepted.** Each is an **Owner-approved implementation decision**, approved on 2026-10-07 after the Storage + Historical Data pre-implementation review. They apply to the prototype historical Record store only. **Frozen contracts remain unchanged; their underlying open items remain open.** Nothing here resolves R-2, R-3, R-4, R-5, R-6, R-12, R-15, R-16, W-10, W-11, W-13 or any other frozen open item.
+
+**Identifiers.** `ST-1` to `ST-3` follow the same smallest-numbering approach as `MD-n` and `MR-n` and are not contract IDs. Each entry separates the SOURCE REQUIREMENT, the OWNER-APPROVED IMPLEMENTATION DECISION and the REMAINING OPEN CONTRACT ITEMS.
+
+### ST-1: Storage technology and location
+- **Status:** Accepted. Owner-approved implementation decision.
+- **SOURCE REQUIREMENT:** records are stored on the rover in LittleFS until the phone confirms upload (coding overview section 2), and the phone app queues them in IndexedDB (section 4). The frozen sources require no laptop-side or server-side store, no storage technology, and no historical query behavior.
+- **OWNER-APPROVED IMPLEMENTATION DECISION:**
+  - SQLite was selected as the prototype storage mechanism, using Python's standard-library `sqlite3` module. No third-party dependency is used.
+  - `storage/` is the implementation package (`storage/record_store.py`, class `RecordStore`).
+  - The database path is supplied by the caller, and `":memory:"` is supported. There is no default database file, and none is created inside the repository.
+  - The schema has one table `records` with a storage-generated integer `id`, a `rover_id` text column and the canonical Record serialized as JSON text in `record_json`, plus an index on `(rover_id, id)`. There are no columns for `time`, `sequence_number`, `photo_id`, `confidence` or individual readings; the stored JSON is the source of truth.
+  - A Record is validated by the existing Record Core validator before it is stored, and an invalid Record is rejected with the validator's errors and not stored. Each write is one atomic transaction.
+  - This store is a prototype-side historical Record store. It does not replace the rover's LittleFS, the phone's IndexedDB, rover-to-phone upload synchronisation or any future production database.
+- **REMAINING OPEN CONTRACT ITEMS:** R-15, W-10, W-11 (how Records arrive, and what "confirms upload" means), R-16 (storage-full behavior), R-5 and R-12 (identifiers stored as opaque values), R-6 (versions stored as given).
+
+### ST-2: History semantics
+- **Status:** Accepted. Owner-approved implementation decision.
+- **SOURCE REQUIREMENT:** none. The frozen sources define no history ordering, uniqueness or retention rule. Open items bearing on this are R-2 (time), R-3 (sequence number) and R-4 (retry-safe unique ID).
+- **OWNER-APPROVED IMPLEMENTATION DECISION:**
+  - The store defines its own insertion-order history. The storage-generated row id is authoritative for storage ordering, and reads are in ascending id order (the latest-Record query returns the highest id).
+  - Record time is not used for ordering, `sequence_number` is not used for ordering or uniqueness, and `rover_id` + `sequence_number` is not a unique key. Duplicate Records are allowed.
+  - The only history operations are: filter by `rover_id`, `limit`, "after storage id" paging, and the latest Record. There are no time-range, sequence-number, sensor-value, photo, anomaly, machine-state or energy queries.
+  - No deletion, retention, purging, upload confirmation, synchronisation or storage-full behavior is implemented.
+- **REMAINING OPEN CONTRACT ITEMS:** R-2, R-3, R-4, R-15, R-16, W-11, W-13.
+
+### ST-3: Corruption policy
+- **Status:** Accepted. Owner-approved implementation decision.
+- **SOURCE REQUIREMENT:** none.
+- **OWNER-APPROVED IMPLEMENTATION DECISION:**
+  - A stored row whose JSON cannot be decoded, or whose JSON is not an object, raises an explicit storage-corruption error that identifies the storage row. Corrupted rows are never silently skipped or repaired.
+  - For this purpose, stored text containing the `NaN` or `Infinity` literals is treated as undecodable, consistent with the rule that stored JSON must not permit them.
+  - Historical reads do not revalidate stored Records against the current Record Core validator. The stored canonical JSON is the historical source of truth, so a later validator change cannot make old history unreadable.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved or closed by this decision.
