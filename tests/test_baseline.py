@@ -17,6 +17,8 @@ from baseline.baseline import (
     EXCLUSION_REASONS,
     SIGNALS,
     BaselineResult,
+    ObservationOutcome,
+    classify_observation,
     compute_baseline,
 )
 from mock_rover.config import RoverConfig
@@ -273,6 +275,128 @@ class TestExclusions(unittest.TestCase):
              "non_finite_or_non_numeric": 1, "wrong_rover": 1},
         )
         self.assertEqual(result.count + sum(result.excluded.values()), result.records_examined)
+
+
+class TestClassifyObservation(unittest.TestCase):
+    """The public per-observation rule that compute_baseline applies to every item."""
+
+    def classify(self, record, signal="soil.nitrogen"):
+        return classify_observation(record, ROVER, signal)
+
+    def assertExcluded(self, outcome, reason):
+        self.assertIsNone(outcome.value)
+        self.assertEqual(outcome.reason, reason)
+
+    def test_valid_finite_ok_is_included(self):
+        outcome = self.classify(make("soil.nitrogen", 12))
+        self.assertEqual((outcome.value, outcome.reason), (12.0, None))
+        self.assertIsInstance(outcome.value, float)
+        self.assertIsNone(outcome.record_id)
+
+    def test_every_signal_is_classified(self):
+        for signal in ALL_SIGNALS:
+            self.assertEqual(self.classify(make(signal, 1.5), signal).value, 1.5, signal)
+
+    def test_valid_finite_with_sensor_fault(self):
+        self.assertExcluded(self.classify(make("soil.nitrogen", 99.0, status="fault")), "sensor_fault")
+
+    def test_null_with_ok(self):
+        self.assertExcluded(self.classify(make("soil.nitrogen", None)), "null_reading")
+
+    def test_null_with_sensor_fault(self):
+        self.assertExcluded(self.classify(make("soil.nitrogen", None, status="fault")), "sensor_fault")
+
+    def test_non_numeric_selected_reading(self):
+        for bad in ("12", True, [1]):
+            self.assertExcluded(self.classify(make("soil.nitrogen", bad)), "non_finite_or_non_numeric")
+
+    def test_non_finite_selected_reading(self):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            self.assertExcluded(self.classify(make("soil.nitrogen", bad)), "non_finite_or_non_numeric")
+
+    def test_a_fault_flag_wins_over_a_bad_reading(self):
+        self.assertExcluded(self.classify(make("soil.nitrogen", "12", status="fault")), "sensor_fault")
+
+    def test_unrelated_validation_defect(self):
+        record = make("soil.nitrogen", 5.0)
+        record["unexpected"] = 1
+        self.assertExcluded(self.classify(record), "invalid_record")
+        record = make("soil.nitrogen", "12")  # defect on the signal plus an unrelated one
+        record["air"]["humidity"] = "wet"
+        self.assertExcluded(self.classify(record), "invalid_record")
+
+    def test_wrong_rover_invalid_record_is_wrong_rover(self):
+        record = make("soil.nitrogen", None, rover_id="other-rover")
+        record["unexpected"] = 1
+        self.assertExcluded(self.classify(record), "wrong_rover")
+
+    def test_requested_rover_invalid_record_is_invalid_record(self):
+        record = make("soil.nitrogen", 5.0)
+        record["unexpected"] = 1
+        self.assertExcluded(self.classify(record), "invalid_record")
+
+    def test_missing_rover_id_is_decided_by_validation(self):
+        record = make("soil.nitrogen", 5.0)
+        del record["rover_id"]
+        self.assertExcluded(self.classify(record), "invalid_record")
+
+    def test_items_that_are_not_records(self):
+        for item in (None, 5, "record", [1], StoredRecord(1, "not a dict")):
+            self.assertExcluded(self.classify(item), "invalid_record")
+
+    def test_stored_record_id_is_reported_and_never_invented(self):
+        outcome = self.classify(StoredRecord(41, make("soil.nitrogen", 3.0)))
+        self.assertEqual((outcome.value, outcome.record_id), (3.0, 41))
+        self.assertIsNone(self.classify(StoredRecord(True, make("soil.nitrogen", 3.0))).record_id)
+        self.assertEqual(self.classify(StoredRecord(8, make("soil.nitrogen", None, status="fault"))).record_id, 8)
+
+    def test_identity_arguments_are_validated(self):
+        record = make("soil.nitrogen", 1.0)
+        for bad in ("", None, 5):
+            with self.assertRaises(ValueError):
+                classify_observation(record, bad, "soil.nitrogen")
+        for bad in ("light", "battery.pct", "", None, 5):
+            with self.assertRaises(ValueError):
+                classify_observation(record, ROVER, bad)
+
+    def test_the_record_is_not_modified(self):
+        records = [make("soil.nitrogen", 5.0), make("soil.nitrogen", None, status="fault"),
+                   make("soil.nitrogen", float("nan")), {"unexpected": 1}]
+        item = StoredRecord(3, make("soil.nitrogen", 2.0))
+        snapshots = copy.deepcopy(records) + [copy.deepcopy(item)]
+        for record in records + [item]:
+            self.classify(record)
+        self.assertEqual(records + [item], snapshots)
+
+    def test_repeated_calls_are_identical(self):
+        record = make("soil.nitrogen", 5.0)
+        self.assertEqual(self.classify(record), self.classify(record))
+        self.assertEqual(self.classify(record), ObservationOutcome(5.0, None, None))
+
+    def test_outcome_is_frozen(self):
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            self.classify(make("soil.nitrogen", 5.0)).value = 1.0
+
+    def test_compute_baseline_applies_exactly_this_rule(self):
+        window = stored(
+            nitrogen([1, 2, 3, 4])
+            + [make("soil.nitrogen", None), make("soil.nitrogen", None, status="fault"),
+               make("soil.nitrogen", 9.0, status="fault"), make("soil.nitrogen", float("nan")),
+               make("soil.nitrogen", "x"), make("soil.nitrogen", 4.0, rover_id="other"),
+               {"unexpected": 1}, None]
+        )
+        result = compute_baseline(ROVER, "soil.nitrogen", window, 2)
+        outcomes = [classify_observation(item, ROVER, "soil.nitrogen") for item in window]
+        included = [o.value for o in outcomes if o.reason is None]
+        tally = {name: sum(1 for o in outcomes if o.reason == name) for name in EXCLUSION_REASONS}
+        self.assertEqual(dict(result.excluded), tally)
+        self.assertEqual(result.count, len(included))
+        self.assertEqual(result.mean, sum(included) / len(included))
+        self.assertEqual(
+            dict(result.excluded),
+            {"null_reading": 1, "sensor_fault": 2, "invalid_record": 2,
+             "non_finite_or_non_numeric": 2, "wrong_rover": 1},
+        )
 
 
 class TestFaultSemantics(unittest.TestCase):

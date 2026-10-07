@@ -96,11 +96,15 @@ class BaselineResult:
     caveats: tuple  # tuple of Caveat
 
 
-def _check_arguments(rover_id, signal, min_count, records):
+def _check_identity(rover_id, signal):
     if not isinstance(rover_id, str) or rover_id == "":
         raise ValueError("rover_id must be a non-empty string")
     if not isinstance(signal, str) or signal not in SIGNALS:
         raise ValueError("unsupported signal: %r" % (signal,))
+
+
+def _check_arguments(rover_id, signal, min_count, records):
+    _check_identity(rover_id, signal)
     if isinstance(min_count, bool) or not isinstance(min_count, int):
         raise ValueError("min_count must be an integer")
     if min_count < MIN_COUNT_FLOOR:
@@ -160,6 +164,29 @@ def _observe(record, rover_id, signal):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         return None, NON_FINITE_OR_NON_NUMERIC
     return float(value), None
+
+
+@dataclass(frozen=True)
+class ObservationOutcome:
+    value: object  # the included finite reading as a float, else None
+    reason: object  # None when included, else one of EXCLUSION_REASONS
+    record_id: object  # storage id if the item carried one, else None
+
+
+def classify_observation(item, rover_id, signal):
+    """Classify one Record's reading of `signal` for `rover_id`.
+
+    This is the per-observation rule that `compute_baseline` applies to every
+    window item (BL-6), exposed unchanged: the rover check precedes validation,
+    a sensor fault always excludes, and a validation failure is attributed to
+    the signal only when every error is on the signal's own path. `item` is a
+    Record (dict) or a StoredRecord-like item with `id` and `record`; anything
+    else is an invalid_record. The item is never modified.
+    """
+    _check_identity(rover_id, signal)
+    record, record_id = _unpack(item)
+    value, reason = _observe(record, rover_id, signal)
+    return ObservationOutcome(value=value, reason=reason, record_id=record_id)
 
 
 def compute_baseline(rover_id, signal, records, min_count):
