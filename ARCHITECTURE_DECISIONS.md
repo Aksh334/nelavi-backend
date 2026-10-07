@@ -234,3 +234,39 @@ These decisions do not resolve them: R-1, R-2, R-3, R-4, R-6, R-7, R-8, R-9, R-1
   - For this purpose, stored text containing the `NaN` or `Infinity` literals is treated as undecodable, consistent with the rule that stored JSON must not permit them.
   - Historical reads do not revalidate stored Records against the current Record Core validator. The stored canonical JSON is the historical source of truth, so a later validator change cannot make old history unreadable.
 - **REMAINING OPEN CONTRACT ITEMS:** none are resolved or closed by this decision.
+
+## Machine State Decisions: Rover Operating State (MS-1 to MS-3)
+
+Date: 2026-10-07. **Frozen contracts remain unchanged; their underlying open items remain open.** Nothing here resolves a frozen open item, and the states below are simulator-level definitions, not industrial-machine claims. `MS-1` to `MS-3` follow the same smallest-numbering approach as `MD-n`, `MR-n` and `ST-n` and are not contract IDs.
+
+**Statuses are mixed on purpose.** MS-1 records what the owner specified in the milestone instruction and is Accepted. MS-2 and MS-3 contain semantics and an integration design made while building and are **Proposed** (owner review pending). Where MS-3 follows an explicit owner instruction, it says so.
+
+### MS-1: Vocabulary, scope and what is not inferable
+- **Status:** Accepted. Owner-approved implementation decision.
+- **SOURCE REQUIREMENT:** the frozen sources define no machine-state vocabulary and no states. They describe rover-side safety mechanisms (obstacle stop at 25 cm, battery cut-off at 9.9 V, coding overview section 2) but do not map them to states. The accepted decision MD-4 states that a sensor fault is not a machine fault or machine health state.
+- **OWNER-APPROVED IMPLEMENTATION DECISION:**
+  - The state vocabulary is the owner-specified set: `unknown`, `off`, `starting`, `running`, `idle`, `overloaded`, `fault`, `maintenance`.
+  - The implementation is the package `machine_state/` (module `machine_state/state.py`), Python standard library only, a pure domain capability: no wall clock, randomness, network, database or hardware.
+  - Only evidence that exists in the current telemetry is used. No motor current, load, vibration, RPM, thermal or production evidence is invented.
+  - `overloaded` is never produced. `fault` and `maintenance` are produced only from explicit inputs (a non-empty `fault_reasons`, or a declared maintenance mode); the Mock Rover supplies neither, so they are unreachable from it. These limits are documented in `NOT_INFERABLE_FROM_TELEMETRY`.
+- **REMAINING OPEN CONTRACT ITEMS:** W-2, W-3, W-4, W-5 (what the rover does at a watchdog trip, obstacle stop, battery cut-off and while reversing) are not mapped to any state. R-7 (status-flag set) is unchanged.
+
+### MS-2: Evidence, state meanings and precedence
+- **Status:** Proposed (simulator-level; owner review pending).
+- **SOURCE REQUIREMENT:** none. The Mock Rover telemetry provides `started`, `camera.homed` and `running` (the rover is moving or turning); these are simulator state (MR-1 to MR-6).
+- **IMPLEMENTATION DECISION:**
+  - Evidence: `started`, `homed`, `moving` (each True, False or not reported), plus the explicit `fault_reasons` and `maintenance_declared` inputs.
+  - Meanings: `off` is "the rover reports it is not started"; `starting` is "started but startup homing is not complete" (the simulator's startup homing, MR-2); `running` is "currently moving or turning"; `idle` is "started, startup complete and stationary". These describe the rover, not an industrial machine.
+  - Precedence, highest first: fault, maintenance, unknown (started not reported), off, starting, running, idle, unknown (insufficient evidence). Contradictory evidence (movement reported while not started) is `unknown`, not an error.
+  - A result carries only the state and a reason that cites the evidence. No confidence value exists.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
+
+### MS-3: Integration boundary
+- **Status:** Proposed (simulator-level; owner review pending), except where marked as an owner instruction.
+- **SOURCE REQUIREMENT:** none. The Record Core schema is frozen into the accepted decisions MD-2 to MD-6.
+- **IMPLEMENTATION DECISION:**
+  - Machine state is not added to the canonical Record, and the Record Core, Mock Rover and Storage are unchanged (owner instruction).
+  - The evaluator consumes a Mock Rover telemetry snapshot through `evidence_from_telemetry`, which uses only `started`, `camera.homed` and `running`. It deliberately ignores sensor status, obstacle, battery, probe and link information, so those never change the state.
+  - `machine_state` does not import `mock_rover`, `storage` or `record`; it only reads the shape of the snapshot.
+  - An optional `previous_state` is echoed back with a `changed` flag. No transition is ever refused or constrained.
+- **REMAINING OPEN CONTRACT ITEMS:** W-8 (whether and how a state would appear in a `status` message) remains open and unaffected.
