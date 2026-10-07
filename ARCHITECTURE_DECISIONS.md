@@ -270,3 +270,42 @@ Date: 2026-10-07. **Frozen contracts remain unchanged; their underlying open ite
   - `machine_state` does not import `mock_rover`, `storage` or `record`; it only reads the shape of the snapshot.
   - An optional `previous_state` is echoed back with a `changed` flag. No transition is ever refused or constrained.
 - **REMAINING OPEN CONTRACT ITEMS:** W-8 (whether and how a state would appear in a `status` message) remains open and unaffected.
+
+## Energy Monitoring Decisions: Rover Energy Calculations (EN-1 to EN-3)
+
+Date: 2026-10-07. **Frozen contracts remain unchanged; their underlying open items remain open.** Nothing here resolves a frozen open item. `EN-1` to `EN-3` follow the same smallest-numbering approach as `MD-n`, `MR-n`, `ST-n` and `MS-n` and are not contract IDs.
+
+**Statuses are mixed on purpose.** EN-1 records what the owner specified in the milestone instruction and is Accepted. EN-2 and EN-3 contain formula and integration choices made while building and are **Proposed** (owner review pending).
+
+### EN-1: Scope and limits
+- **Status:** Accepted. Owner-approved implementation decision.
+- **SOURCE REQUIREMENT:** the frozen sources define no energy metrics, units, tariffs or production quantities. The build document lists design figures for the rover (3 x 18650 battery, "11.1 V, about 28 Wh", a 12 V 10 W solar panel, a charger at 12.60 V and 1.0 A); they are not telemetry and are not used as defaults. The canonical Record carries a battery voltage only. The Mock Rover telemetry provides battery `pct`, `voltage_v`, `charging`, activity `mode` and `sim_time`; it provides no power, current, capacity in watt-hours or solar rate.
+- **OWNER-APPROVED IMPLEMENTATION DECISION:**
+  - The implementation is the package `energy/` (module `energy/energy.py`), Python standard library only, pure and deterministic: no wall clock, randomness, network, database or hardware.
+  - Only calculations justified by inputs that exist are implemented. No electrical, production, tariff or efficiency data is invented, and nothing is calculated when an input is unavailable.
+  - Rover battery energy is kept distinct from machine electrical consumption and is never presented as it.
+  - Elapsed time is only a supplied duration or the Mock Rover's simulated `sim_time`.
+  - Deferred, not implemented: baselines and baseline deviation, peak demand, energy per unit or per kg, utilization, idle and startup energy, tariff schedules, and real voltage, current, power factor, frequency or cumulative-meter measurements.
+  - Record Core, Mock Rover, Storage, Machine State and calibration are unchanged.
+- **REMAINING OPEN CONTRACT ITEMS:** R-13 (which readings the contract Record holds, and units), R-2 and W-13 (time source) remain open.
+
+### EN-2: Formulas, units and assumptions
+- **Status:** Proposed (owner review pending).
+- **SOURCE REQUIREMENT:** none.
+- **IMPLEMENTATION DECISION:**
+  - Units: power in W, duration in s, energy in Wh, tariff in currency per kWh. The only constants are 3600 s per hour and 1000 Wh per kWh. There is no default capacity, tariff or currency.
+  - `energy_from_power`: Wh = W x s / 3600, for a supplied non-negative power assumed constant over the duration. No source feeds it yet; it is for future electrical measurements.
+  - `battery_net_energy`: Wh = (pct_end - pct_start) / 100 x capacity_wh. This is an estimate that treats stored energy as linear in the charge percentage, uses a caller-supplied capacity, and is net of any charging (positive means net charge). It is not gross consumption.
+  - `average_power_w`: Wh over elapsed hours. A zero duration is reported as an error, not as zero.
+  - `energy_cost`: kWh x a caller-supplied tariff and currency, accepted only for energy from supplied power. Rover battery net energy is rejected because it is not billable consumption.
+  - Results state their quantity, unit, duration, kind, source and assumptions. There are no confidence values or efficiency scores. Invalid or unavailable inputs raise errors; nothing is silently replaced with zero.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
+
+### EN-3: Integration and deferrals
+- **Status:** Proposed (owner review pending).
+- **SOURCE REQUIREMENT:** none.
+- **IMPLEMENTATION DECISION:**
+  - `battery_interval_from_telemetry` uses only `sim_time` and `battery.pct` from two Mock Rover telemetry snapshots plus a supplied capacity. It does not modify the snapshots.
+  - The telemetry does not expose the solar rate, so only the net battery energy change can be derived, not gross consumption.
+  - Machine State is not used: no implemented calculation needs it. No state is assumed to imply any energy level (for example idle is not treated as inefficient, and off is not treated as zero energy). Utilization and idle or startup energy attribution are deferred, because their definitions are not established.
+- **REMAINING OPEN CONTRACT ITEMS:** W-8 (what telemetry a `status` message carries) remains open and unaffected.
