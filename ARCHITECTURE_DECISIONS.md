@@ -121,3 +121,79 @@ Use this format only for decisions actually made. Do not create entries or IDs i
 
 ### Items that remain open in the frozen contracts
 These decisions do not resolve them: R-1, R-2, R-3, R-4, R-6, R-7, R-8, R-9, R-10, R-11, R-12, R-13, R-14, R-16, R-17, R-18, every W- item, and every A- item. The frozen contracts are unchanged and still list them as open. Items not named here, such as R-5 and R-15, are also still open in the frozen documents.
+
+## Simulator Implementation Decisions: Mock Rover + Telemetry (MR-1 to MR-6)
+
+**Status of all six entries: Accepted.** Each is an **Owner-approved simulator implementation decision**, approved on 2026-10-07 after a focused review (first recorded as Proposed the same day). They were made while building the Nelavi mock rover because the frozen sources are open on these points. They are local simulator implementation decisions and apply to the simulator only. **Frozen contracts remain unchanged; their underlying open items remain open.** Nothing here resolves a frozen open item (for example W-3, W-5, A-5, A-6, R-2, R-3, R-5 or R-12) or describes the real rover's behavior. Each entry separates the SOURCE REQUIREMENT / PHYSICAL REFERENCE from the SIMULATOR IMPLEMENTATION DECISION.
+
+**Identifiers.** `MR-1` to `MR-6` follow the same smallest-numbering approach as `MD-n` above and are not contract IDs. The R-, W- and A- IDs are the real open-item IDs.
+
+### MR-1: Simulator package, language and determinism
+- **Status:** Accepted. Owner-approved simulator implementation decision.
+- **Related open items:** none.
+- **Source requirement / physical reference:** the coding overview section 9 describes the mock rover as "a laptop program that speaks the same WebSocket protocol, returns fake readings and a sample photo, and has an 'unclear' switch". The coding overview section 1 repository layout names the directory `mock-rover/`.
+- **Simulator implementation decision:** a top-level `mock_rover/` package. Python 3.14.6 and standard-library-only are owner-selected implementation choices for this milestone; the frozen documents do not require them. The package is named `mock_rover` because a hyphenated directory cannot be imported as a Python package. This does not alter the frozen `mock-rover/` terminology. Simulated time only (no wall clock, no sleeping, no network). Determinism comes from an explicit seed and hash-based noise keyed by (seed, name, coordinates or time bucket), so results do not depend on call order. Movement is integrated in sub-steps of at most `time_step_s`, and simulated time is set once per `advance` call to avoid float drift.
+- **Still open:** the real WebSocket protocol (W- items) is not implemented here.
+
+### MR-2: Camera home and tilt convention
+- **Status:** Accepted. Owner-approved simulator implementation decision.
+- **Related open items (remain open):** A-5, A-6.
+- **Source requirement / physical reference:** the build document gives the stepper "0–350°", a home switch, and the servo "60° down to 45° up". The physical home direction remains unspecified, and so does the meaning of `pan` and `tilt` in `SHOOT`.
+- **Simulator implementation decision:**
+  - The simulator's default pan zero is 0 degrees, and the pan zero is configurable.
+  - `startup()` automatically performs a simulated homing, and panning requires the camera to be homed.
+  - Tilt is an abstract simulator range. The default simulator tilt range is -60 to +45 degrees, with negative values meaning down in the simulator convention.
+  - The initial simulator tilt defaults to 0.0 degrees.
+  - These conventions are simulator-only. They are not physical rover requirements, they do not define the physical `SHOOT` parameters, and they do not resolve the underlying frozen ambiguity.
+- **Still open:** A-5, A-6.
+
+### MR-3: Obstacle behavior
+- **Status:** Accepted. Owner-approved simulator implementation decision.
+- **Related open items (remain open):** W-3, W-5.
+- **Source requirement / physical reference:** an HC-SR04 stop at 25 cm is a rover-side mechanism ("the rover stops if anything is within 25 cm", build document, which also describes the sensor as measuring the "Distance ahead"). The comparison operator (W-3) and the reverse behavior (W-5) are open.
+- **Simulator implementation decision:**
+  - The default stop distance is 0.25 m.
+  - The comparison mode is configurable, and inclusive comparison is the simulator default. The inclusive default is not a resolution of W-3.
+  - Reverse motion and in-place turning are permitted by fixed simulator behavior. This is not configurable and is not a resolution of W-5.
+  - When an arc turn meets the forward obstacle condition, its forward component is inhibited while rotation continues.
+  - The 0.02 m and 4.0 m sensor range values are simulator and reference defaults only; they do not establish a frozen hardware requirement.
+  - All of this is simulator behavior only and is not the final physical safety implementation.
+- **Still open:** W-3, W-5.
+
+### MR-4: Record values the simulator generates
+- **Status:** Accepted. Owner-approved simulator implementation decision.
+- **Related open items (remain open):** R-2, R-3, R-5, R-6, R-12, R-17, W-16.
+- **Source requirement / physical reference:** the record items are fixed by the Record Core decisions MD-2 to MD-6. The coding overview section 9 says the mock rover returns "a sample photo" and has an "unclear" switch.
+- **Simulator implementation decision:**
+  - Simulator time is the string `sim:<seconds>`, where seconds are simulated elapsed seconds since the simulator started. This is for deterministic simulation and testing. It does not establish the final wall-clock or time-source behavior. R-2 remains open.
+  - The sequence number starts from a configurable simulator value and increments only when a Record is successfully validated. This is simulator behavior only and does not resolve R-3.
+  - The default `rover_id` is a simulator placeholder. It does not establish final rover identity or provenance. R-5 remains open.
+  - Fixture captures contain no real image data. Photo IDs use the placeholder form `mock-photo-<seed>-<nnnn>`; these identifiers represent simulator and test fixtures only and not the final physical photo retrieval scheme. R-12 remains open.
+  - Version strings are placeholders (R-6 remains open). Fixture labels use a `mock_*` placeholder form, plus `unclear` (R-17 remains open). An explicit "unclear" switch forces the `unclear` label.
+  - Every generated Record is validated by the Record Core validator; the simulator defines no second schema.
+- **Still open:** R-2, R-3, R-5, R-6, R-12, R-17, W-16.
+
+### MR-5: Telemetry and link
+- **Status:** Accepted. Owner-approved simulator implementation decision.
+- **Related open items (remain open):** W-1, W-7, W-8, W-9, W-10, W-15.
+- **Source requirement / physical reference:** the WebSocket message names are `drive`, `status`, `test_here` and `record`; their payloads and semantics are open.
+- **Simulator implementation decision:**
+  - The telemetry snapshot is simulator-internal. It is not presented as a new WebSocket `status` message.
+  - Wheel commands are simulator controls and not a definition of the frozen `drive {dir, speed}` protocol.
+  - `test_here` is not implemented in this milestone.
+  - The connection model is limited to connection state, a configurable delay and scheduled or manual dropouts.
+- **Still open:** all W- items listed above; the unresolved WebSocket open items remain open.
+
+### MR-6: Probe and sensor faults
+- **Status:** Accepted. Owner-approved simulator implementation decision.
+- **Related open items (remain open):** R-7, R-13.
+- **Source requirement / physical reference:**
+  - Coding overview section 2: each sensor has a status flag and a failure never blocks a record.
+  - Build document: the operator presses the probe pod into the soil "with a foot to a fixed 10 cm depth".
+  - The owner-supplied physical-model mapping for this milestone: probe insertion is an operator action, and the 10 cm depth stop is a design reference.
+- **Simulator implementation decision:**
+  - The probe is retracted, inserted with depth OK, or inserted with depth not OK. A measurement needs depth OK. This probe insertion and depth model is a simulator decision based on the build document and the owner-supplied mapping.
+  - An injected sensor fault makes that sensor's readings `null` and its status `"fault"`. This follows the already accepted MD-4 decision.
+  - BH1750 light remains simulator telemetry only and is not added to the canonical Record Core.
+  - A measurement, a camera movement and a camera capture each consume simulated time and use the simulator's testing-mode battery drain. These are simulator behaviors, not physical performance claims.
+- **Still open:** R-7, R-13.
