@@ -400,3 +400,67 @@ Date: 2026-10-08. **Frozen contracts remain unchanged; their underlying open ite
 - **Status:** Accepted. Owner-approved implementation decision.
 - **IMPLEMENTATION DECISION:** the package is `anomaly/` (module `anomaly/anomaly.py`), Python standard library plus `baseline.baseline`. The result `DeviationResult` is a frozen dataclass with the approved fields only (`rover_id`, `signal`, `record_id`, `status`, `reason`, `observed_value`, `deviation`, `z_score`, `reference`, `threshold`, `comparison`, `unit`, `context`, `caveats`); the unit is `None` because units are unresolved (R-13). The code is pure, deterministic, non-mutating and independent of wall-clock time, randomness, network, files, database, hardware and providers. Baseline, Record Core, Mock Rover, Storage, Machine State, Energy and calibration behaviour is unchanged.
 - **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
+
+## Image Reference Decisions: Photo Reference V1 (IP-1 to IP-8)
+
+Date: 2026-10-08. **Frozen contracts remain unchanged; their underlying open items remain open.** Nothing here resolves a frozen open item. `IP-1` to `IP-8` follow the same numbering approach as the earlier decision groups and are not contract IDs. All eight are owner-approved implementation decisions (Accepted). The implementation is `image_pipeline/reference.py`, committed as `3de450c`; these decisions were recorded afterwards.
+
+**Source-supported facts used.** The canonical Record carries `leaf_label`, `confidence` and `photo_id` (coding overview section 1). Record Core decisions MD-4 and MD-5 make these three fields all populated or all `null`, and limit `confidence` to 0 through 100. The frozen sources define no photo format, dimensions or metadata, no photo transfer or storage path, and no photo ID format. The Mock Rover produces no image data (MR-4).
+
+**Frozen ambiguities that stay unresolved.** These decisions are approved Image Reference V1 implementation decisions only. They do not answer the following questions, which remain open in the frozen documents:
+- The photo path, storage and format: where photos are stored and how they reach the phone (W-12, A-12).
+- Photo ID semantics: its format and which of the three photos it names (R-12).
+- Confidence semantics: the meaning and scale of `conf` (A-10, R-9).
+- Three-photo semantics: the scope of "unclear" and the case of three different labels (A-11, R-10, R-11).
+- Camera-failure behaviour: the effect of a camera or leaf-check failure on the Record (R-8).
+- Capture-mode semantics: how the capture mode is selected (A-14).
+- Mock-photo representation: how the mock rover represents the sample photo and the "unclear" case (W-16), and how mock data is marked (R-18).
+- The proxy payload: the relationship between the Record and the proxy's "photo, readings, crop and language" input (R-14).
+- Time, sequence-number and version semantics (R-2, R-3, R-4, R-6).
+
+### IP-1: Bytes-free V1 scope
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** Image Reference V1 is photo-reference and traceability only. It has no image bytes, files, formats, dimensions, transport, retrieval, storage, provider integration, image processing, resizing or normalization. There is no NVIDIA, Nebius or Tavily integration.
+- **REMAINING OPEN CONTRACT ITEMS:** W-12, A-12 and R-14 remain open.
+
+### IP-2: Input and Record Core validation
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** `reference_photo` accepts a Record dict or a StoredRecord-like input. It reuses the existing Record Core validator, which remains the sole authority for Record validation; no Record Core validation rule is duplicated. Invalid Record input produces the status `invalid_record`.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
+
+### IP-3: Opaque photo ID
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** `photo_id` is treated as an opaque non-empty string. No parsing, extension, UUID, numbering, uniqueness, filename, path or URL semantics are imposed. It is not assumed which of the three photos an ID represents.
+- **REMAINING OPEN CONTRACT ITEMS:** R-12 remains open.
+
+### IP-4: Traceability preservation
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** these fields of a valid Record are preserved: `rover_id`, `record_id` (when supplied by the caller), `sequence_number`, `time`, `photo_id`, `leaf_label`, `confidence` and `versions`. Time, sequence-number and version semantics are not interpreted, and no ordering, deduplication, provenance or timing logic is introduced.
+- **REMAINING OPEN CONTRACT ITEMS:** R-2, R-3, R-4 and R-6 remain open.
+
+### IP-5: Exactly three result statuses
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the result has exactly the statuses `photo_referenced`, `no_photo_reference` and `invalid_record`. `unclear` remains a leaf label, not a status. No camera-failure, retrieval, transfer, upload, storage, provider, diagnosis, health or similar status is introduced.
+- **REMAINING OPEN CONTRACT ITEMS:** R-8 remains open.
+
+### IP-6: Pass-through leaf information
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** `leaf_label` and `confidence` are passed through after Record Core validation. The 70% threshold, the 20-point rule, three-photo majority logic and confidence conversion are not implemented, and confidence is not interpreted beyond the existing Record Core validation. These remain outside Image Reference V1 because their underlying source semantics remain unresolved.
+- **REMAINING OPEN CONTRACT ITEMS:** A-10, R-9, A-11, R-10, R-11 and R-17 remain open.
+
+### IP-7: Mandatory caveats
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** every Image Reference V1 result carries five caveats:
+  - `no_photo_content`: photo content is unavailable.
+  - `photo_id_opaque`: `photo_id` is an opaque string.
+  - `photo_relation_unresolved`: the relationship between the photo reference and the three photos is unresolved.
+  - `confidence_semantics_unresolved`: confidence semantics beyond Record Core validation are unresolved.
+  - `mock_records_unmarked`: the current Record schema does not mark a Record as coming from the mock rover.
+
+  The result context states that photo content is unavailable.
+- **REMAINING OPEN CONTRACT ITEMS:** R-12, A-10, R-9 and R-18 remain open.
+
+### IP-8: Purity and isolation
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** Image Reference V1 is deterministic and side-effect-free. It uses no network, filesystem, database, clock or time generation, randomness, provider API or new dependency, and it does not mutate its input. It uses the existing Record Core validator and does not depend on Mock Rover, Storage, Baseline, Anomaly, Machine State, Energy or calibration behaviour.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
