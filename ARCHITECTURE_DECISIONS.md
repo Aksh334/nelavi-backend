@@ -484,3 +484,23 @@ Date: 2026-10-09. **Frozen contracts remain unchanged; their underlying open ite
 - **Isolation:** the text test was performed outside the repository. The test script `nv_text.ps1` remains in an external scratchpad. No test script, response artifact, image, API key or credential was added to the repository, and the repository was clean after the test.
 - **Next:** any future image test is a separate controlled milestone.
 - **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this record. In particular, the open question of which Nemotron model accepts images (see Open Architectural Questions) remains open.
+
+## Provider Verification Record: NVIDIA Image Inference Verification V2 (PC-2)
+
+Date: 2026-10-09. **Frozen contracts remain unchanged; their underlying open items remain open.** This is a factual record of an isolated verification test, not an implementation decision. `PC-2` is a governance record identifier, not a contract ID. It follows PC-1 and does not alter it. The statement in PC-1 that image inference remained unverified was true when PC-1 was written and is superseded only to the extent stated below.
+
+### PC-2: Verified image input and image-derived text response
+- **Status:** Recorded. Factual result of an isolated test performed outside the repository.
+- **Verification:** a real Nelavi leaf image was successfully processed through the NVIDIA hosted API using the verified Nemotron model. Result: PASS for basic image-input acceptance and image-derived text response.
+- **Request:** one isolated request.
+  - Endpoint: `https://integrate.api.nvidia.com/v1/chat/completions`
+  - Model: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`
+  - Method: POST
+  - Input: one PNG leaf photograph (220,288 bytes, a file outside the repository) supplied as a base64 data URL in an `image_url` content part, together with the neutral visual-observation prompt: "Describe what is visibly present in this image. Focus on observable visual features only. Do not identify a plant disease, cause, treatment, or diagnosis. Do not invent information that cannot be determined from the image."
+- **Response:** HTTP 200, an OpenAI-style chat completion with `finish_reason` `stop`, and assistant text describing observable visual features: green leaves, brown and yellow patches, browned and ragged edges, small holes and a blurred green foliage background. The prompt prohibited diagnosis, cause and treatment, and the response gave none.
+- **Scope:** this verifies image inference capability only. It does not verify disease diagnosis, disease classification, agricultural accuracy, production reliability, provider uptime, latency, cost, rate limits, capacity, behaviour across many images or leaf conditions, ESP32-CAM capture compatibility, rover-to-phone image transfer, the unresolved three-photo semantics, camera-failure behaviour, the photo storage and transfer architecture, or production provider fallback.
+- **Image caveat:** the tested file was a screenshot of a leaf photograph, not a raw ESP32-CAM capture.
+- **Earlier failures:** two earlier image requests returned HTTP 503 `ResourceExhausted: Worker local total request limit reached (16/16)`. Their cause remains unestablished, and this successful request does not establish it.
+- **Security and isolation:** `NVIDIA_API_KEY` was read only from the runtime environment and was never printed. The test ran from a temporary scratchpad outside the repository. No credential, test script, request body, base64 image data, response artifact or image was added to the repository. The verification made no source-code, dependency, architecture, contract or Image Reference V1 change.
+- **Production status:** no production NVIDIA adapter exists. This record does not by itself authorize production integration. Nebius and Tavily have not been integrated.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this record. In particular, W-12, A-12 and R-12 (photo path, storage and photo ID semantics) and A-11, R-10 and R-11 (three-photo semantics) remain open.
