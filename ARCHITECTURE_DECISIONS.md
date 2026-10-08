@@ -359,3 +359,44 @@ Date: 2026-10-07. **Frozen contracts remain unchanged; their underlying open ite
 - **Status:** Accepted. Owner-approved implementation decision.
 - **IMPLEMENTATION DECISION:** the package is `baseline/` (module `baseline/baseline.py`), Python standard library plus the existing Record Core validator. The result is a frozen dataclass with the approved fields only. The code is pure, deterministic, non-mutating and independent of wall-clock time, randomness, network, files, database, hardware and providers. Record Core, Mock Rover, Storage, Machine State, Energy and calibration are unchanged.
 - **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
+
+## Anomaly Decisions: Statistical Deviation Evaluation V1 (AD-1 to AD-8)
+
+Date: 2026-10-08. **Frozen contracts remain unchanged; their underlying open items remain open.** Nothing here resolves a frozen open item. `AD-1` to `AD-8` follow the same numbering approach as the earlier decision groups and are not contract IDs. All eight are owner-approved implementation decisions (Accepted). The implementation is `anomaly/anomaly.py`.
+
+**Source-supported facts used.** The frozen sources define no anomaly or deviation rule. The canonical Record carries no machine telemetry (no vibration, RPM, current, machine voltage, power, load or production quantity), no machine state, and no position. Baseline V1 (BL-1 to BL-8) provides a descriptive reference, and commit `1a274e2` exposed its per-observation classification as the public `classify_observation`, as a prerequisite to this work; that change added no rule.
+
+**Frozen ambiguities that stay unresolved.** R-2 (time), R-3 and R-4 (sequence), R-6 (version provenance), R-13 (readings and units) and R-1 (validation ranges). V1 uses no time, sequence, version, unit or range, so it does not depend on them.
+
+### AD-1: Scope and vocabulary
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** V1 is a deterministic, descriptive statistical deviation evaluation of one observation against a supplied descriptive reference. It is not machine-anomaly detection and claims no machine health, failure, failure prediction, fault diagnosis, cause, severity, maintenance recommendation, probability, confidence or RUL. The statuses are `within_reference`, `deviates_from_reference` and `not_evaluated`. Persistence, trend, EWMA, change-point detection, engineering-limit rules, relative (percentage) deviation and ML are not implemented.
+
+### AD-2: Supported signals
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** only `air.temperature`, `air.humidity` and `air.pressure` are supported. The five soil signals and `battery.voltage_v` are rejected, because of the Baseline V1 caveats (position-confounded soil values; battery voltage that trends with usage). Any other signal is rejected.
+
+### AD-3: Deviation and z-score
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** `deviation = observed_value - reference.mean`. When the reference spread is usable, `z_score = deviation / reference.std` (the reference's sample standard deviation). The observation deviates when `abs(z_score) > threshold`; equality is `within_reference`. The threshold is caller-supplied, finite and greater than zero, with no default. It is a configuration value, not a scientific claim.
+
+### AD-4: Supplied reference
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the caller supplies an existing `BaselineResult` for the same rover and signal; no baseline is computed during evaluation. The observation is classified with the public `classify_observation`, not by duplicated logic. As a best-effort guard, an observation whose storage id lies within the reference's `first_id`/`last_id` span is rejected. The guard is partial (the ids are those of the first and last supplied items, and may be absent); the caller remains responsible for the reference window.
+
+### AD-5: Data quality
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the observation reasons are those of `classify_observation` (`sensor_fault`, `null_reading`, `non_finite_or_non_numeric`, `invalid_record`, `wrong_rover`), and a fault flag takes precedence as it does there. An insufficient reference gives `insufficient_reference`. A reference `std` that is zero, or at or below the caller-supplied `min_spread` (finite, not negative, no default), gives `reference_has_no_spread`. In all these cases the status is `not_evaluated` and the result is never `deviates_from_reference`. No epsilon or other numeric default is used.
+
+### AD-6: No windowing or temporal behaviour
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** no time-window, sequence-window, Storage access, persistence, consecutive-observation, sampling-gap or deduplication logic. The optional batch helper evaluates observations independently in the supplied order and carries no state between them.
+
+### AD-7: Machine state
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** results are not grouped or conditioned by machine state. Machine state is not part of the Record, and the result context says it is unavailable.
+
+### AD-8: Implementation boundary
+- **Status:** Accepted. Owner-approved implementation decision.
+- **IMPLEMENTATION DECISION:** the package is `anomaly/` (module `anomaly/anomaly.py`), Python standard library plus `baseline.baseline`. The result `DeviationResult` is a frozen dataclass with the approved fields only (`rover_id`, `signal`, `record_id`, `status`, `reason`, `observed_value`, `deviation`, `z_score`, `reference`, `threshold`, `comparison`, `unit`, `context`, `caveats`); the unit is `None` because units are unresolved (R-13). The code is pure, deterministic, non-mutating and independent of wall-clock time, randomness, network, files, database, hardware and providers. Baseline, Record Core, Mock Rover, Storage, Machine State, Energy and calibration behaviour is unchanged.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
