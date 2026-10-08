@@ -6,6 +6,7 @@ Meaningful project changes from the start of implementation onward. No version n
 
 - Added governance documentation: `PROJECT_STATUS.md`, `PROJECT_HISTORY.md`, `CHANGELOG.md`, `ARCHITECTURE_DECISIONS.md` (created, not yet committed at the time of writing).
 - No application implementation has occurred.
+- Recorded verified NVIDIA text-only connectivity (`ARCHITECTURE_DECISIONS.md`, PC-1); image inference remains unverified after two HTTP 503 ResourceExhausted responses; no provider integration code was added.
 
 ## Baseline
 

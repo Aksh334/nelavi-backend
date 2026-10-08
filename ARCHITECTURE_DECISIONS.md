@@ -464,3 +464,23 @@ Date: 2026-10-08. **Frozen contracts remain unchanged; their underlying open ite
 - **Status:** Accepted. Owner-approved implementation decision.
 - **IMPLEMENTATION DECISION:** Image Reference V1 is deterministic and side-effect-free. It uses no network, filesystem, database, clock or time generation, randomness, provider API or new dependency, and it does not mutate its input. It uses the existing Record Core validator and does not depend on Mock Rover, Storage, Baseline, Anomaly, Machine State, Energy or calibration behaviour.
 - **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this decision.
+
+## Provider Connectivity Record: NVIDIA Text-Only Test (PC-1)
+
+Date: 2026-10-09. **Frozen contracts remain unchanged; their underlying open items remain open.** This is a factual record of an isolated diagnostic test, not an implementation decision. `PC-1` is a governance record identifier, not a contract ID. NVIDIA production integration has not started. Nebius has not been integrated. Tavily has not been integrated.
+
+### PC-1: Verified text-only connectivity
+- **Status:** Recorded. Factual result of an isolated test performed outside the repository.
+- **Verified text-only connectivity.** One isolated text-only request was made:
+  - Endpoint: `https://integrate.api.nvidia.com/v1/chat/completions`
+  - Model: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`
+  - Method: POST
+  - Input: text only. The user message was "Reply with exactly: PONG". No image was sent.
+  - Credential: `NVIDIA_API_KEY` was read from the environment. The API key and the Authorization header were not printed.
+  - Result: HTTP 200. The response was an OpenAI-style chat completion with `finish_reason` `stop`. The returned assistant text was `PONG`.
+- **What this demonstrates:** the tested credential, endpoint, model identifier and text-only request path worked at that time.
+- **Image inference remains unverified.** Two earlier isolated image attempts were made, each sending a PNG as a base64 data URL in an `image_url` content part. Each returned HTTP 503 `ResourceExhausted: Worker local total request limit reached (16/16)`. They are kept as historical test results. The cause of those responses has not been established. The text-only result does not verify image inference.
+- **Not verified:** image inference, real crop-photo inference, image payload compatibility in an actual integration, NVIDIA reliability, NVIDIA capacity, NVIDIA latency, NVIDIA cost, provider abstraction, disease-detection accuracy and diagnosis capability.
+- **Isolation:** the text test was performed outside the repository. The test script `nv_text.ps1` remains in an external scratchpad. No test script, response artifact, image, API key or credential was added to the repository, and the repository was clean after the test.
+- **Next:** any future image test is a separate controlled milestone.
+- **REMAINING OPEN CONTRACT ITEMS:** none are resolved by this record. In particular, the open question of which Nemotron model accepts images (see Open Architectural Questions) remains open.
