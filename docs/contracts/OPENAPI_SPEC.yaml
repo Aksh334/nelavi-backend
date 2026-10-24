@@ -1,0 +1,1216 @@
+openapi: 3.1.0
+info:
+  title: CropSync / Nelavi Backend API
+  version: 2.0.0
+  description: >
+    Production and development API contract for the CropSync / Nelavi precision
+    agriculture backend. Serves FlutterFlow mobile and web client applications,
+    in-field rover telemetry ingestion, AI leaf diagnostics, agronomic research,
+    voice assistant services, and educational modules.
+servers:
+  - url: http://127.0.0.1:8765
+    description: Local development and demo server (loopback default)
+  - url: https://api.cropsync.example.com
+    description: Remote deployment gateway with Bearer authentication
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Public health probe
+      description: Returns service operational status. Unauthenticated in all modes.
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '405':
+          description: Method not allowed.
+    head:
+      summary: Public health check head request
+      operationId: headHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy.
+        '405':
+          description: Method not allowed.
+
+  /api/health:
+    get:
+      summary: Health probe alias under /api
+      operationId: getApiHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '405':
+          description: Method not allowed.
+    head:
+      summary: Health probe head alias
+      operationId: headApiHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy.
+        '405':
+          description: Method not allowed.
+
+  /api/state:
+    get:
+      summary: Server configuration and feature flags state
+      description: Returns server operational mode, available providers, scenario definitions, history counts, and voice assistant readiness.
+      operationId: getServerState
+      responses:
+        '200':
+          description: Server state payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerStateResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/history:
+    get:
+      summary: Query stored rover telemetry records
+      description: Returns historical rover telemetry records ordered by storage insertion ID descending.
+      operationId: getHistory
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of records to return (defaults to 20, max 100).
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: History record list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+        '400':
+          description: Invalid query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/run:
+    post:
+      summary: Execute rover sampling scenario
+      description: Runs a mock rover sampling scenario, validates and stores the Record in SQLite, and computes agronomic advice and farmer report.
+      operationId: postRunScenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunScenarioRequest'
+      responses:
+        '200':
+          description: Scenario executed and record stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunScenarioResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+
+  /api/run-orchestrated:
+    post:
+      summary: Execute orchestrated workflow with fake providers
+      description: Runs the orchestrated pipeline (IM-2) using local simulator telemetry and deterministic fake providers.
+      operationId: postRunOrchestrated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunOrchestratedRequest'
+      responses:
+        '200':
+          description: Orchestrated report generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunOrchestratedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+
+  /api/run-integrated:
+    post:
+      summary: Multi-modal integrated workflow
+      description: >
+        Runs multi-modal workflow combining base64 leaf image findings (NVIDIA),
+        agricultural research (Tavily), compute summary, and agronomic synthesis (OpenRouter).
+      operationId: postRunIntegrated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunIntegratedRequest'
+      responses:
+        '200':
+          description: Integrated workflow output.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunIntegratedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Real provider stages disabled in remote mode without explicit enablement.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+
+  /api/second-opinion:
+    post:
+      summary: Standalone leaf image second opinion
+      description: Evaluates leaf photo and telemetry readings using configured image provider (simulated or NVIDIA).
+      operationId: postSecondOpinion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecondOpinionRequest'
+      responses:
+        '200':
+          description: Second opinion generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecondOpinionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Provider rejected request or returned closed error code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecondOpinionResponse'
+
+  /api/advisory:
+    post:
+      summary: Search agricultural advisory sources
+      description: Queries allowlisted official agricultural research domains via Tavily Search.
+      operationId: postAdvisory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdvisoryRequest'
+      responses:
+        '200':
+          description: Advisory evidence retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvisoryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Research provider error or zero results found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvisoryResponse'
+
+  /api/research-pro/start:
+    post:
+      summary: Initiate Tavily Research Pro deep research task
+      description: Spawns an asynchronous deep research job on official agricultural domains.
+      operationId: postResearchProStart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResearchProStartRequest'
+      responses:
+        '200':
+          description: Research task running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchProTaskStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Task creation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchProTaskStatus'
+
+  /api/research-pro/status:
+    get:
+      summary: Poll status of Research Pro task
+      operationId: getResearchProStatus
+      parameters:
+        - name: task
+          in: query
+          required: true
+          description: Local research task identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current task status and results if completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchProTaskStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analyze:
+    post:
+      summary: Low-level raw PNG demo analyzer
+      description: Analyzes raw PNG bytes using the local demo analyzer.
+      operationId: postAnalyzeRaw
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Analysis successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawAnalysisResponse'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          description: Analysis rejected or malformed.
+
+  /api/voice/transcribe:
+    post:
+      summary: Transcribe farmer speech audio
+      description: Converts uploaded audio bytes (WebM, WAV, MP3) into text using ElevenLabs STT.
+      operationId: postVoiceTranscribe
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          description: Language hint ('en', 'hi', 'te').
+          schema:
+            type: string
+            enum: [en, hi, te]
+      requestBody:
+        required: true
+        content:
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+          audio/wav:
+            schema:
+              type: string
+              format: binary
+          audio/mpeg:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Speech transcribed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionResponse'
+        '400':
+          description: Invalid audio or transcription error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/voice/synthesize:
+    post:
+      summary: Synthesize spoken audio response
+      description: Converts text into base64 MP3 audio using ElevenLabs Multilingual TTS.
+      operationId: postVoiceSynthesize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceSynthesizeRequest'
+      responses:
+        '200':
+          description: Audio synthesized successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSynthesizeResponse'
+        '400':
+          description: Synthesis error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSynthesizeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/assistant/ask:
+    post:
+      summary: Ask agronomic assistant question with live rover telemetry fusion
+      description: Fuses in-field sensor telemetry (NPK, moisture, temperature) to answer agronomic queries.
+      operationId: postAssistantAsk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantAskRequest'
+      responses:
+        '200':
+          description: Assistant response generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantAskResponse'
+        '400':
+          description: Invalid question or processing error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantAskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/learning/lessons:
+    get:
+      summary: Retrieve precision agriculture lesson catalog
+      description: Returns catalog of 5 educational lessons in English, Hindi, or Telugu.
+      operationId: getLearningLessons
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          description: Target language ('en', 'hi', 'te', default 'en').
+          schema:
+            type: string
+            enum: [en, hi, te]
+            default: en
+      responses:
+        '200':
+          description: Lesson catalog list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningLessonsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/learning/lesson:
+    get:
+      summary: Retrieve detailed lesson module content
+      description: Returns full stages, objectives, and practical farmer tips for a lesson.
+      operationId: getLearningLessonDetail
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Lesson identifier (e.g. 'crop_care_stages', 'soil_health_testing').
+          schema:
+            type: string
+        - name: lang
+          in: query
+          required: false
+          description: Target language ('en', 'hi', 'te', default 'en').
+          schema:
+            type: string
+            enum: [en, hi, te]
+            default: en
+      responses:
+        '200':
+          description: Lesson detail payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningLessonDetail'
+        '400':
+          description: Missing or invalid lesson ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Lesson ID not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/learning/progress:
+    post:
+      summary: Update farmer lesson completion progress
+      description: Marks a lesson module completed and returns updated overall progress count.
+      operationId: postLearningProgress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LearningProgressRequest'
+      responses:
+        '200':
+          description: Progress recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningProgressResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Remote authentication token configured via server --auth-token-env.
+
+  responses:
+    BadRequest:
+      description: Bad request or malformed payload.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid Bearer authentication token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Host not allowed or remote provider invocation rejected.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PayloadTooLarge:
+      description: Request body exceeds configured byte limit.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnsupportedMediaType:
+      description: Content-Type header is missing or unsupported.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: The request body must be JSON.
+
+    ServerStateResponse:
+      type: object
+      required: [scenarios, max_image_bytes, rover_id, history_max, second_opinion, research, research_pro, orchestrated, integrated, voice_assistant]
+      properties:
+        scenarios:
+          type: array
+          items:
+            type: object
+        max_image_bytes:
+          type: integer
+        rover_id:
+          type: string
+        history_max:
+          type: integer
+        second_opinion:
+          type: object
+        research:
+          type: object
+        research_pro:
+          type: object
+        orchestrated:
+          type: object
+        integrated:
+          type: object
+        voice_assistant:
+          type: object
+          required: [supported_languages, available]
+          properties:
+            supported_languages:
+              type: array
+              items:
+                type: string
+            available:
+              type: boolean
+
+    HistoryResponse:
+      type: object
+      required: [total, records]
+      properties:
+        total:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoredRecord'
+
+    StoredRecord:
+      type: object
+      required: [id, record]
+      properties:
+        id:
+          type: integer
+        record:
+          $ref: '#/components/schemas/RoverRecord'
+
+    RoverRecord:
+      type: object
+      required:
+        - time
+        - sequence_number
+        - rover_id
+        - battery
+        - soil
+        - air
+        - sensor_status
+        - leaf_label
+        - confidence
+        - photo_id
+        - versions
+      properties:
+        time:
+          type: string
+        sequence_number:
+          type: integer
+        rover_id:
+          type: string
+        battery:
+          type: object
+          required: [voltage_v]
+          properties:
+            voltage_v:
+              type: number
+        soil:
+          type: object
+          required: [nitrogen, phosphorus, potassium, moisture, temperature]
+          properties:
+            nitrogen:
+              type: number
+              nullable: true
+            phosphorus:
+              type: number
+              nullable: true
+            potassium:
+              type: number
+              nullable: true
+            moisture:
+              type: number
+              nullable: true
+            temperature:
+              type: number
+              nullable: true
+        air:
+          type: object
+          required: [temperature, humidity, pressure]
+          properties:
+            temperature:
+              type: number
+              nullable: true
+            humidity:
+              type: number
+              nullable: true
+            pressure:
+              type: number
+              nullable: true
+        sensor_status:
+          type: object
+          required: [npk, moisture, soil_temperature, air, battery]
+          properties:
+            npk:
+              type: string
+              enum: [ok, fault]
+            moisture:
+              type: string
+              enum: [ok, fault]
+            soil_temperature:
+              type: string
+              enum: [ok, fault]
+            air:
+              type: string
+              enum: [ok, fault]
+            battery:
+              type: string
+              enum: [ok, fault]
+        leaf_label:
+          type: string
+          nullable: true
+        confidence:
+          type: integer
+          minimum: 0
+          maximum: 100
+        photo_id:
+          type: string
+          nullable: true
+        versions:
+          type: object
+          required: [firmware, model, rules, calibration]
+          properties:
+            firmware:
+              type: string
+            model:
+              type: string
+            rules:
+              type: string
+            calibration:
+              type: string
+
+    RunScenarioRequest:
+      type: object
+      required: [scenario]
+      properties:
+        scenario:
+          type: string
+          enum: [normal_operation, probe_measurement, sensor_fault]
+        crop:
+          type: string
+        region:
+          type: string
+        growth_stage:
+          type: string
+
+    RunScenarioResponse:
+      type: object
+      required: [stored_id, record, advice, report]
+      properties:
+        stored_id:
+          type: integer
+        record:
+          $ref: '#/components/schemas/RoverRecord'
+        advice:
+          type: object
+        report:
+          type: object
+
+    RunOrchestratedRequest:
+      type: object
+      required: [scenario]
+      properties:
+        scenario:
+          type: string
+        crop:
+          type: string
+        region:
+          type: string
+        growth_stage:
+          type: string
+        research:
+          type: string
+          enum: [skip, fake, fake_error]
+        question:
+          type: string
+
+    RunOrchestratedResponse:
+      type: object
+      required: [workflow, fake_providers, label, data_source]
+      properties:
+        workflow:
+          type: string
+          example: orchestrated_fake
+        fake_providers:
+          type: boolean
+          example: true
+        label:
+          type: string
+        data_source:
+          type: string
+
+    RunIntegratedRequest:
+      type: object
+      properties:
+        scenario:
+          type: string
+        crop:
+          type: string
+        region:
+          type: string
+        growth_stage:
+          type: string
+        question:
+          type: string
+        image_png_base64:
+          type: string
+          description: Base64-encoded PNG image data.
+        providers:
+          type: object
+          properties:
+            image:
+              type: string
+              enum: [skip, fake, real]
+            research:
+              type: string
+              enum: [skip, fake, real]
+            compute:
+              type: string
+              enum: [skip, fake]
+            synthesis:
+              type: string
+              enum: [skip, fake, real]
+
+    RunIntegratedResponse:
+      type: object
+      required: [stored_id, record, integrated, report, data_source, label, real_stages]
+      properties:
+        stored_id:
+          type: integer
+        record:
+          $ref: '#/components/schemas/RoverRecord'
+        integrated:
+          type: object
+        report:
+          type: object
+        data_source:
+          type: string
+        label:
+          type: string
+        real_stages:
+          type: array
+          items:
+            type: string
+        findings_observation:
+          type: object
+        findings_reply_facts:
+          type: object
+        findings_request_fingerprint:
+          type: object
+        findings_error_class:
+          type: object
+        synthesis_diagnostic:
+          type: object
+
+    SecondOpinionRequest:
+      type: object
+      required: [image_png_base64, readings]
+      properties:
+        image_png_base64:
+          type: string
+        readings:
+          type: object
+          required: [soil, air]
+          properties:
+            soil:
+              type: object
+            air:
+              type: object
+        crop:
+          type: string
+        language:
+          type: string
+
+    SecondOpinionResponse:
+      type: object
+      required: [opinion, error_code, simulated, model, label]
+      properties:
+        opinion:
+          type: string
+          nullable: true
+        error_code:
+          type: string
+          nullable: true
+        simulated:
+          type: boolean
+        model:
+          type: string
+          nullable: true
+        label:
+          type: string
+
+    AdvisoryRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+        crop:
+          type: string
+        region:
+          type: string
+        growth_stage:
+          type: string
+
+    AdvisoryResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        query:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            type: object
+        caveats:
+          type: array
+          items:
+            type: string
+
+    ResearchProStartRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+
+    ResearchProTaskStatus:
+      type: object
+      required: [status, task]
+      properties:
+        status:
+          type: string
+          enum: [running, completed, failed, timed_out, error]
+        task:
+          type: string
+        question:
+          type: string
+        report:
+          type: object
+        error_code:
+          type: string
+          nullable: true
+
+    RawAnalysisResponse:
+      type: object
+      required: [status, findings]
+      properties:
+        status:
+          type: string
+        findings:
+          $ref: '#/components/schemas/ImageFindings'
+        error_code:
+          type: string
+          nullable: true
+
+    ImageFindings:
+      type: object
+      required: [crop, growth_stage, symptoms, needs_more]
+      properties:
+        crop:
+          $ref: '#/components/schemas/CropFindings'
+        growth_stage:
+          type: object
+          required: [candidate, evidence, uncertainty]
+          properties:
+            candidate:
+              type: string
+              nullable: true
+            evidence:
+              type: array
+              items:
+                type: string
+            uncertainty:
+              type: string
+              enum: [unspecified, low, medium, high]
+        symptoms:
+          type: array
+          items:
+            $ref: '#/components/schemas/SymptomObservation'
+        needs_more:
+          type: array
+          items:
+            type: string
+
+    CropFindings:
+      type: object
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/CropCandidate'
+
+    CropCandidate:
+      type: object
+      required: [name, evidence, uncertainty]
+      properties:
+        name:
+          type: string
+        evidence:
+          type: array
+          items:
+            type: string
+        uncertainty:
+          type: string
+          enum: [unspecified, low, medium, high]
+
+    SymptomObservation:
+      type: object
+      required: [observation, possible_interpretations]
+      properties:
+        observation:
+          type: string
+        possible_interpretations:
+          type: array
+          items:
+            type: string
+
+    TranscriptionResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        text:
+          type: string
+        language_code:
+          type: string
+        duration_seconds:
+          type: number
+        error_code:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+
+    VoiceSynthesizeRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+        language:
+          type: string
+          enum: [en, hi, te]
+        voice_id:
+          type: string
+
+    VoiceSynthesizeResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        audio_base64:
+          type: string
+        content_type:
+          type: string
+          example: audio/mpeg
+        duration_seconds:
+          type: number
+        error_code:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+
+    AssistantAskRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+        language:
+          type: string
+          enum: [en, hi, te]
+          default: en
+        include_rover_data:
+          type: boolean
+          default: true
+
+    AssistantAskResponse:
+      type: object
+      required: [status, text, language]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        text:
+          type: string
+        language:
+          type: string
+        rover_context:
+          type: object
+          nullable: true
+        advisory_warning:
+          type: string
+          nullable: true
+        error_code:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+
+    LearningLessonsResponse:
+      type: object
+      required: [total, completed_count, lessons]
+      properties:
+        total:
+          type: integer
+          example: 5
+        completed_count:
+          type: integer
+        lessons:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningLessonSummary'
+
+    LearningLessonSummary:
+      type: object
+      required: [id, title, summary, category, duration_minutes, icon, completed]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        category:
+          type: string
+        duration_minutes:
+          type: integer
+        icon:
+          type: string
+        objective:
+          type: string
+        completed:
+          type: boolean
+
+    LearningLessonDetail:
+      type: object
+      required: [id, title, summary, category, duration_minutes, icon, sections, farmer_tips, completed]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        category:
+          type: string
+        duration_minutes:
+          type: integer
+        icon:
+          type: string
+        language:
+          type: string
+        objective:
+          type: string
+        sections:
+          type: array
+          items:
+            type: object
+            required: [heading, body]
+            properties:
+              heading:
+                type: string
+              body:
+                type: string
+        farmer_tips:
+          type: array
+          items:
+            type: string
+        completed:
+          type: boolean
+
+    LearningProgressRequest:
+      type: object
+      required: [lesson_id]
+      properties:
+        lesson_id:
+          type: string
+        completed:
+          type: boolean
+          default: true
+
+    LearningProgressResponse:
+      type: object
+      required: [status, lesson_id, completed, completed_count, total]
+      properties:
+        status:
+          type: string
+          example: ok
+        lesson_id:
+          type: string
+        completed:
+          type: boolean
+        completed_count:
+          type: integer
+        total:
+          type: integer
+          example: 5

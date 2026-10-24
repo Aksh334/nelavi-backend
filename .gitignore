@@ -8,3 +8,36 @@ desktop.ini
 
 # Python bytecode cache created when running tests
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment variables and secrets
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.cert
+
+# Local SQLite databases and write-ahead logs
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Scratch scripts, logs, test artifacts, and coverage
+scratch/
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local checkpoints, IDE metadata, and browser automation evidence
+.checkpoints/
+.browser_evidence/
+.claude/
+.vscode/
+.idea/

@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Nelavi local demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the content</a>
+
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">N</span>
+        <span class="brand-text">
+          <span class="brand-name">Nelavi</span>
+          <span class="brand-sub">Precision-agriculture workspace</span>
+        </span>
+      </div>
+      <nav class="nav" aria-label="Sections">
+        <a href="#integrated">Run workflow</a>
+        <a href="#supporting-tools">Supporting tools</a>
+        <a href="#overview">Overview</a>
+        <a href="#rover">1 Rover</a>
+        <a href="#record">2 Record</a>
+        <a href="#image">3 Image</a>
+        <a href="#history">4 History</a>
+        <a href="#second-opinion">5 Second opinion</a>
+        <a href="#research">6 Research</a>
+        <a href="#orchestrated">7 Orchestrated</a>
+        <a href="#voice-assistant">8 Assistant & Learning</a>
+      </nav>
+      <button id="theme-toggle" type="button" class="ghost">Switch theme</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <h1>Nelavi local demo</h1>
+    <p class="banner" id="banner"><strong>Checking application mode...</strong> This page states whether it
+      is a simulation or uses a cloud AI provider only after the server has confirmed it.</p>
+  </div>
+
+  <main id="main">
+    <section id="integrated">
+      <div class="panel-head">
+        <h2>Run the integrated workflow</h2>
+        <span class="tag sim">Main workflow</span>
+      </div>
+      <p class="demo-label" id="iw-label">One run, four stages: image findings, research, a compute summary and a
+        synthesis. Each stage is skipped, run by a labelled FAKE stand-in on this machine, or run by the real
+        provider this server was started with. A real provider is used only for a stage you set to Real and only
+        when you press Run; a provider being configured never means it has been called. A real stage is offered only
+        when the server confirms it is configured, and a failed stage is reported as failed, never replaced by a fake.</p>
+      <p class="muted" id="iw-help">The synthesis stage needs both the image and the research stage to finish; it is
+        skipped otherwise. A synthesis is generated text, not evidence, and never replaces a finding. The specialist
+        role has no definition yet and is always skipped.</p>
+
+      <h3>1. Describe the run</h3>
+      <div class="form-grid">
+        <div class="field">
+          <label for="iw-scenario">Scenario</label>
+          <select id="iw-scenario"></select>
+        </div>
+        <div class="field">
+          <label for="iw-crop">Crop (you state it)</label>
+          <input id="iw-crop" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="iw-region">Region</label>
+          <input id="iw-region" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="iw-stage">Growth stage</label>
+          <input id="iw-stage" type="text" autocomplete="off">
+        </div>
+      </div>
+      <p id="iw-scenario-description" class="muted"></p>
+      <p class="muted">Crop, region and growth stage are optional. They are never guessed, and blank is fine.</p>
+
+      <h3>2. Choose how each stage runs</h3>
+      <div class="form-grid">
+        <div class="field">
+          <label for="iw-image-mode">Image findings stage</label>
+          <select id="iw-image-mode"></select>
+        </div>
+        <div class="field">
+          <label for="iw-research-mode">Research stage</label>
+          <select id="iw-research-mode"></select>
+        </div>
+        <div class="field">
+          <label for="iw-compute-mode">Compute summary stage</label>
+          <select id="iw-compute-mode"></select>
+        </div>
+        <div class="field">
+          <label for="iw-synthesis-mode">Synthesis stage</label>
+          <select id="iw-synthesis-mode"></select>
+        </div>
+        <div class="field wide">
+          <label for="iw-file">PNG image (optional for the fake image stage, required for a real one)</label>
+          <input id="iw-file" type="file" accept="image/png">
+        </div>
+        <div class="field wide">
+          <label for="iw-question">Question (used by the research stage and given to the synthesis)</label>
+          <input id="iw-question" type="text" autocomplete="off">
+        </div>
+      </div>
+      <p class="muted" id="iw-image-note">If no image is chosen, the fake image stage uses a built-in 1 by 1 placeholder
+        picture and ignores it anyway: the fake stand-in never looks at an image.</p>
+
+      <h3 id="iw-run-heading">What this run will do</h3>
+      <ul id="iw-run-summary"></ul>
+      <p class="muted" id="iw-run-note">This list shows your current choices. Nothing is sent anywhere until you press
+        Run, and only the stages set to Real contact a provider. Each run saves one new simulated Record to the
+        history (Section 4); the older runner in Section 1 saves its own Record separately.</p>
+      <div class="actions">
+        <button id="iw-run" type="button" disabled>Run integrated workflow</button>
+      </div>
+      <p id="iw-status" class="status" role="status">Checking whether this section is available...</p>
+      <div id="iw-result" hidden>
+        <p class="demo-label" id="iw-result-label"></p>
+        <div id="iw-body" class="report"></div>
+      </div>
+    </section>
+
+    <section id="supporting-tools">
+      <div class="panel-head">
+        <h2>Supporting tools</h2>
+        <span class="tag demo">Standalone</span>
+      </div>
+      <p class="muted">The sections below are standalone tools and records. You do not need them to run the workflow
+        above. They keep their own inputs, and each can save or show its own results.</p>
+    </section>
+
+    <section id="overview">
+      <div class="panel-head">
+        <h2>Overview</h2>
+        <span class="tag sim">Simulated rover data</span>
+      </div>
+      <p class="muted">A summary of this server. The rover, its readings and its photo reference come from a local
+        simulator, not from a physical rover. Nothing below is a field measurement.</p>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Records saved</span><span class="stat-value" id="ov-records">Checking...</span></div>
+        <div class="stat"><span class="stat-label">Latest Record</span><span class="stat-value" id="ov-latest">Checking...</span></div>
+        <div class="stat"><span class="stat-label">Sensor faults in latest Record</span><span class="stat-value" id="ov-faults">Checking...</span></div>
+        <div class="stat"><span class="stat-label">Second Opinion</span><span class="stat-value" id="ov-so">Checking...</span></div>
+        <div class="stat"><span class="stat-label">Research</span><span class="stat-value" id="ov-research">Checking...</span></div>
+        <div class="stat"><span class="stat-label">Orchestrated report</span><span class="stat-value" id="ov-orch">Checking...</span></div>
+        <div class="stat"><span class="stat-label">Integrated workflow</span><span class="stat-value" id="ov-integrated">Checking...</span></div>
+        <div class="stat"><span class="stat-label">Voice &amp; Learning</span><span class="stat-value" id="ov-va">Checking...</span></div>
+      </div>
+    </section>
+
+    <section id="rover">
+      <div class="panel-head">
+        <h2>1. Mock rover</h2>
+        <span class="tag sim">Simulated</span>
+      </div>
+      <p>Run a deterministic simulated scenario. The result is validated by the project's
+        Record Core and saved to the local history. This is the older stand-alone runner: the main workflow above
+        has its own inputs and saves its own Record, so running both saves two Records.</p>
+      <div class="form-grid">
+        <div class="field">
+          <label for="scenario">Scenario</label>
+          <select id="scenario"></select>
+        </div>
+        <div class="field">
+          <label for="user-crop">Crop (you state it)</label>
+          <input id="user-crop" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="user-region">Region</label>
+          <input id="user-region" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="user-stage">Growth stage</label>
+          <input id="user-stage" type="text" autocomplete="off">
+        </div>
+      </div>
+      <p class="muted">Optional: tell the report what you know. It is never guessed, and leaving these
+        blank is fine.</p>
+      <div class="actions">
+        <button id="run" type="button">Run scenario</button>
+      </div>
+      <p id="scenario-description" class="muted"></p>
+      <p id="run-status" class="status" role="status"></p>
+    </section>
+
+    <section id="record">
+      <div class="panel-head">
+        <h2>2. Readings and Record validation</h2>
+        <span class="tag sim">Simulated</span>
+      </div>
+      <p id="record-empty" class="muted">No scenario has been run yet.</p>
+      <div id="record-body" hidden>
+        <p id="validation" class="status"></p>
+        <ul id="validation-errors"></ul>
+        <h3>Readings</h3>
+        <div id="reading-cards"></div>
+        <h3>Advice</h3>
+        <p id="advice" class="muted"></p>
+        <ul id="advice-items"></ul>
+        <h3>Farmer report</h3>
+        <p id="report-origin" class="demo-label"></p>
+        <div id="report-body" class="report"></div>
+        <h3>Photo reference</h3>
+        <p id="photo" class="muted"></p>
+        <details>
+          <summary>Show the Record exactly as validated</summary>
+          <pre id="record-json"></pre>
+        </details>
+      </div>
+    </section>
+
+    <section id="image">
+      <div class="panel-head">
+        <h2>3. Image (demo-only analysis)</h2>
+        <span class="tag demo">Demo routine</span>
+      </div>
+      <p>Choose a PNG file from your computer. It is sent only to this local server, is not
+        saved, and is "analysed" by a demo routine that reports facts about the file itself.
+        It is not an AI result and not a plant-health assessment.</p>
+      <div class="field">
+        <label for="file">PNG file</label>
+        <input id="file" type="file" accept="image/png">
+      </div>
+      <div class="actions">
+        <button id="analyze" type="button">Run demo analysis</button>
+      </div>
+      <p id="analysis-status" class="status" role="status"></p>
+      <div id="analysis-body" hidden>
+        <p class="demo-label" id="analysis-label"></p>
+        <p id="analysis-text"></p>
+        <p class="muted" id="analysis-model"></p>
+        <ul id="analysis-caveats"></ul>
+      </div>
+    </section>
+
+    <section id="history">
+      <div class="panel-head">
+        <h2>4. Saved Record history</h2>
+        <span class="tag sim">Simulated</span>
+      </div>
+      <div class="actions">
+        <button id="refresh" type="button" class="ghost">Refresh</button>
+      </div>
+      <p id="history-status" class="muted"></p>
+      <div class="table-wrap">
+        <table id="history-table">
+          <caption class="visually-hidden">Saved Records, newest first</caption>
+          <thead><tr><th scope="col">Storage id</th><th scope="col">Time</th><th scope="col">Sequence</th><th scope="col">Battery (V)</th>
+            <th scope="col">Sensor faults</th><th scope="col">Photo id</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h3>Battery voltage across the listed Records</h3>
+      <p class="muted" id="trend-note">Each bar is scaled between the smallest and largest value in this list only. It
+        is not a limit or a health range, and the values are simulated.</p>
+      <p class="muted" id="trend-empty">No Records to plot yet. Run a scenario in Section 1.</p>
+      <ol id="trend-list" class="trend"></ol>
+    </section>
+
+    <section id="second-opinion">
+      <div class="panel-head">
+        <h2>5. Second Opinion</h2>
+      </div>
+      <p class="demo-label" id="so-notice">Checking application mode... Second Opinion stays
+        disabled until the server confirms whether it is simulated or uses a cloud AI provider.</p>
+      <p class="muted" id="so-help">Choose a PNG and describe the crop. Where the data goes depends
+        on the application mode, which is being checked.</p>
+      <form id="so-form" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label for="so-file">PNG file</label>
+            <input id="so-file" type="file" accept="image/png">
+          </div>
+          <div class="field">
+            <label for="so-crop">Crop</label>
+            <input id="so-crop" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="so-language">Language</label>
+            <input id="so-language" type="text" autocomplete="off">
+          </div>
+        </div>
+        <div id="so-readings"></div>
+        <div class="actions">
+          <button id="so-submit" type="submit" disabled>Get second opinion</button>
+        </div>
+      </form>
+      <p id="so-status" class="status" role="status">Checking application mode...</p>
+      <div id="so-result" hidden>
+        <p class="demo-label" id="so-label"></p>
+        <p id="so-opinion" class="opinion"></p>
+        <p class="muted" id="so-model"></p>
+      </div>
+    </section>
+
+    <section id="research">
+      <div class="panel-head">
+        <h2>6. Research (advisory)</h2>
+      </div>
+      <p class="demo-label" id="rs-notice">Checking whether research is configured... Research stays
+        disabled until the server confirms it.</p>
+      <p class="muted" id="rs-help">Type a question. The crop, region and growth stage you entered in
+        Section 1 (if any) are used to judge whether a source applies.</p>
+      <form id="rs-form" novalidate>
+        <div class="field">
+          <label for="rs-question">Question</label>
+          <input id="rs-question" type="text" autocomplete="off">
+        </div>
+        <div class="actions">
+          <button id="rs-submit" type="submit" disabled>Search sources</button>
+        </div>
+      </form>
+      <p id="rs-status" class="status" role="status">Checking research configuration...</p>
+      <div id="rs-result" hidden>
+        <p class="muted" id="rs-note"></p>
+        <div id="rs-sources" class="report"></div>
+      </div>
+      <div id="rp-result" hidden>
+        <p class="demo-label" id="rp-label"></p>
+        <p class="muted" id="rp-meta"></p>
+        <div id="rp-text" class="research-text"></div>
+        <h4 id="rp-sources-heading"></h4>
+        <p class="muted" id="rp-sources-note"></p>
+        <ul id="rp-sources"></ul>
+        <h4>Limitations</h4>
+        <ul id="rp-caveats"></ul>
+      </div>
+    </section>
+
+    <section id="orchestrated">
+      <div class="panel-head">
+        <h2>7. Orchestrated report (fake providers)</h2>
+        <span class="tag fake">FAKE PROVIDERS</span>
+      </div>
+      <p class="demo-label fake" id="om-label">FAKE PROVIDERS. This section builds a report through the orchestration
+        layer from a new simulated Record and a fake research client that returns made-up text. Nothing is sent
+        to any outside service. It does not replace the report in Section 2. It is saved to the history once.</p>
+      <p class="muted" id="om-help">The scenario and the crop, region and growth stage come from Section 1. The
+        image stage is always skipped, because rover photo storage is not defined yet. The report's origin is
+        shown as "unknown" on purpose.</p>
+      <div class="form-grid">
+        <div class="field">
+          <label for="om-research">Research stage</label>
+          <select id="om-research"></select>
+        </div>
+        <div class="field wide">
+          <label for="om-question">Question (needed for the fake research choices)</label>
+          <input id="om-question" type="text" autocomplete="off">
+        </div>
+      </div>
+      <div class="actions">
+        <button id="om-run" type="button" disabled>Run orchestrated report</button>
+      </div>
+      <p id="om-status" class="status" role="status">Checking whether this section is available...</p>
+      <div id="om-result" hidden>
+        <p class="demo-label fake" id="om-result-label"></p>
+        <div id="om-body" class="report"></div>
+      </div>
+    </section>
+
+    <section id="voice-assistant">
+      <div class="panel-head">
+        <h2>8. Voice & Multilingual Learning Assistant</h2>
+        <span class="tag sim" id="va-badge">AI Assistant & Audio</span>
+      </div>
+      <p class="demo-label" id="va-label">Ask precision agriculture questions in English, Hindi, or Telugu using voice or text. Answers integrate CropSync rover telemetry, NPK and moisture sensors, and agronomic knowledge. Includes structured learning lessons on crop care, soil health, and irrigation.</p>
+
+      <div class="assistant-container">
+        <h3>A. Agricultural Voice Assistant</h3>
+        <p class="muted">Speak your question or type directly. Choose your preferred response language.</p>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="va-language">Language / भाषा / భాష</label>
+            <select id="va-language">
+              <option value="en" selected>English</option>
+              <option value="hi">Hindi (हिन्दी)</option>
+              <option value="te">Telugu (తెలుగు)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="va-include-telemetry">Include In-Field Rover Telemetry</label>
+            <select id="va-include-telemetry">
+              <option value="true" selected>Yes (Use latest soil NPK & moisture)</option>
+              <option value="false">No (General agronomic advisory)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="voice-controls-bar">
+          <button id="va-mic-btn" type="button" class="btn-voice">
+            <span class="mic-icon" aria-hidden="true">🎤</span>
+            <span id="va-mic-label">Record Voice Question</span>
+          </button>
+          <span id="va-rec-timer" class="rec-timer" hidden>00:00</span>
+          <span id="va-voice-status" class="status" role="status">Ready. Tap to speak or type below.</span>
+        </div>
+
+        <div class="field wide">
+          <label for="va-question">Question (Recognized Transcript or Typed Text)</label>
+          <textarea id="va-question" rows="3" placeholder="e.g. What is my soil moisture and how should I irrigate? or यूरिया का सही प्रयोग कैसे करें? or నేలలో తేమ తక్కువగా ఉంటే ఏం చేయాలి?" autocomplete="off"></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="va-submit-btn" type="button" class="primary">Ask Assistant</button>
+          <button id="va-clear-btn" type="button" class="ghost">Clear</button>
+        </div>
+
+        <div id="va-answer-card" class="answer-card" hidden>
+          <div class="answer-header">
+            <h4>CropSync Assistant Answer</h4>
+            <span id="va-answer-lang-badge" class="tag info">English</span>
+          </div>
+
+          <div id="va-audio-bar" class="audio-bar">
+            <button id="va-play-audio-btn" type="button" class="btn-audio">
+              <span class="audio-icon" aria-hidden="true">🔊</span>
+              <span id="va-audio-btn-label">Listen to Answer (ElevenLabs Voice)</span>
+            </button>
+            <audio id="va-audio-player" hidden></audio>
+            <span id="va-audio-status" class="muted">Audio generated via ElevenLabs</span>
+          </div>
+
+          <div id="va-answer-body" class="answer-text"></div>
+
+          <div class="answer-meta">
+            <h5>Data Sources & Telemetry</h5>
+            <ul id="va-sources-list"></ul>
+            <p id="va-disclaimer" class="disclaimer-text"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="learning-container">
+        <h3>B. Precision Agriculture Learning Lessons</h3>
+        <p class="muted">Interactive educational modules for farmers and operators. Track your completion progress.</p>
+
+        <div class="learning-progress-bar">
+          <div class="progress-info">
+            <span id="va-progress-text">Progress: 0 of 5 Lessons Completed (0%)</span>
+          </div>
+          <div class="progress-track">
+            <div id="va-progress-fill" class="progress-fill"></div>
+          </div>
+        </div>
+
+        <div id="va-lessons-grid" class="lessons-grid"></div>
+
+        <div id="va-lesson-viewer" class="lesson-viewer" hidden>
+          <div class="lesson-viewer-header">
+            <div class="lesson-title-area">
+              <span id="va-lesson-icon" class="lesson-icon">🌱</span>
+              <div>
+                <h4 id="va-lesson-title">Lesson Title</h4>
+                <span id="va-lesson-meta" class="muted">Duration: 5 mins | Category: Crop Management</span>
+              </div>
+            </div>
+            <button id="va-close-lesson-btn" type="button" class="ghost">Close Lesson</button>
+          </div>
+
+          <div class="lesson-objective-box">
+            <strong>Learning Objective:</strong>
+            <p id="va-lesson-objective"></p>
+          </div>
+
+          <div id="va-lesson-sections" class="lesson-sections"></div>
+
+          <div class="farmer-tips-box">
+            <strong>💡 Practical Farmer Tips:</strong>
+            <ul id="va-lesson-tips"></ul>
+          </div>
+
+          <div class="lesson-actions">
+            <button id="va-complete-lesson-btn" type="button" class="primary">Mark as Completed</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p class="muted">Nelavi local demo. Listens on this machine only. Values labelled simulated or fake are produced
+      by local code and are not measurements, sources or advice.</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
