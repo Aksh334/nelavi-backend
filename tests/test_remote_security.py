@@ -117,6 +117,48 @@ class TestHealthEndpoint(NoSockets):
             self.assertEqual(resp.allow, "GET, HEAD")
             self.assertEqual(as_json(resp), {"error": "Method not allowed."})
 
+    def test_health_get_and_head_exempt_from_host_validation(self):
+        unexpected_hosts = (
+            "localhost",
+            "127.0.0.1:10000",
+            "evil.example.com",
+            "render-internal-probe:8080",
+            "",
+            None,
+        )
+        for app, app_label in ((self.remote_app, "remote"), (self.local_app, "local")):
+            for path in ("/health", "/api/health"):
+                for method in ("GET", "HEAD"):
+                    for host in unexpected_hosts:
+                        resp = call(app, method, path, host=host)
+                        self.assertEqual(resp.status, 200, f"{app_label} {method} {path} with host={host}")
+                        self.assertEqual(resp.body, b'{"status": "ok"}')
+                        self.assertEqual(resp.content_type, "application/json; charset=utf-8")
+
+    def test_health_unsupported_methods_do_not_gain_host_exemption(self):
+        # Unsupported methods with an unexpected Host header must still be rejected
+        # by the normal Host validation (403), not bypassed to 405.
+        for path in ("/health", "/api/health"):
+            for method in ("POST", "PUT", "DELETE", "PATCH"):
+                # Remote mode with disallowed host -> 403 Host not allowed
+                resp_remote = call(self.remote_app, method, path, host="evil.com")
+                self.assertEqual(resp_remote.status, 403, f"remote {method} {path}")
+                self.assertEqual(as_json(resp_remote), {"error": "Host not allowed."})
+
+                # Local mode with disallowed host -> 403
+                resp_local = call(self.local_app, method, path, host="evil.com")
+                self.assertEqual(resp_local.status, 403, f"local {method} {path}")
+                self.assertEqual(as_json(resp_local), {"error": "This demo only answers on its own local address."})
+
+                # Allowed host with unsupported method -> 405 Method not allowed
+                resp_remote_allowed = call(self.remote_app, method, path, host=REMOTE_HOST)
+                self.assertEqual(resp_remote_allowed.status, 405, f"remote allowed {method} {path}")
+                self.assertEqual(resp_remote_allowed.allow, "GET, HEAD")
+
+                resp_local_allowed = call(self.local_app, method, path, host=HOST)
+                self.assertEqual(resp_local_allowed.status, 405, f"local allowed {method} {path}")
+                self.assertEqual(resp_local_allowed.allow, "GET, HEAD")
+
 
 class TestStaticWebUIDisablement(NoSockets):
     """Static web UI (/, /static/*) must be disabled in remote mode, preserved in local mode."""
@@ -299,19 +341,38 @@ class TestHostHeaderValidation(NoSockets):
         self.remote_app = make_remote_app(self.service, allowed_hosts={"api.nelavi.app:8765", "api.nelavi.app"})
 
     def test_local_mode_only_answers_local_host(self):
-        self.assertEqual(call(self.local_app, "GET", "/health", host=HOST).status, 200)
-        self.assertEqual(call(self.local_app, "GET", "/health", host="localhost:8765").status, 200)
-        self.assertEqual(call(self.local_app, "GET", "/health", host="evil.com").status, 403)
-        self.assertEqual(call(self.local_app, "GET", "/health", host=None).status, 403)
+        # Non-health routes (/ and /api/state) must strictly enforce local Host
+        self.assertEqual(call(self.local_app, "GET", "/", host=HOST).status, 200)
+        self.assertEqual(call(self.local_app, "GET", "/", host="localhost:8765").status, 200)
+        self.assertEqual(call(self.local_app, "GET", "/", host="evil.com").status, 403)
+        self.assertEqual(call(self.local_app, "GET", "/", host=None).status, 403)
+
+        self.assertEqual(call(self.local_app, "GET", "/api/state", host=HOST).status, 200)
+        self.assertEqual(call(self.local_app, "GET", "/api/state", host="evil.com").status, 403)
+        self.assertEqual(call(self.local_app, "GET", "/api/state", host=None).status, 403)
 
     def test_remote_mode_only_answers_allowed_hosts(self):
         headers = {"authorization": "Bearer " + AUTH_TOKEN}
+        # Allowed hosts succeed on /api/state and /api/history
         self.assertEqual(call(self.remote_app, "GET", "/api/state", host="api.nelavi.app:8765", headers=headers).status, 200)
         self.assertEqual(call(self.remote_app, "GET", "/api/state", host="api.nelavi.app", headers=headers).status, 200)
         self.assertEqual(call(self.remote_app, "GET", "/api/state", host="API.NELAVI.APP:8765", headers=headers).status, 200)
         self.assertEqual(call(self.remote_app, "GET", "/api/state", host="API.NELAVI.APP", headers=headers).status, 200)
+        self.assertEqual(call(self.remote_app, "GET", "/api/history", host="api.nelavi.app:8765", headers=headers).status, 200)
+
+        # Unexpected hosts rejected with 403 on /api/state
         self.assertEqual(call(self.remote_app, "GET", "/api/state", host="evil.com", headers=headers).status, 403)
         self.assertEqual(call(self.remote_app, "GET", "/api/state", host=HOST, headers=headers).status, 403)
+        self.assertEqual(call(self.remote_app, "GET", "/api/state", host="localhost", headers=headers).status, 403)
+        self.assertEqual(call(self.remote_app, "GET", "/api/state", host="127.0.0.1:10000", headers=headers).status, 403)
+        self.assertEqual(call(self.remote_app, "GET", "/api/state", host=None, headers=headers).status, 403)
+
+        # Unexpected hosts rejected with 403 on other protected routes (/api/history and /api/run)
+        self.assertEqual(call(self.remote_app, "GET", "/api/history", host="evil.com", headers=headers).status, 403)
+        self.assertEqual(call(self.remote_app, "GET", "/api/history", host="localhost", headers=headers).status, 403)
+        run_headers = {"authorization": "Bearer " + AUTH_TOKEN, "content-type": "application/json"}
+        self.assertEqual(call(self.remote_app, "POST", "/api/run", b'{"scenario": "normal_operation"}', host="evil.com", headers=run_headers).status, 403)
+        self.assertEqual(call(self.remote_app, "POST", "/api/run", b'{"scenario": "normal_operation"}', host="localhost", headers=run_headers).status, 403)
 
 
 class TestRemoteRealProviderGuard(NoSockets):

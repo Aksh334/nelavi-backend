@@ -91,16 +91,21 @@ class DemoApp:
 
     # ---------------------------------------------------------- routing
     def _route(self, method, target, headers, read_body):
+        parts = urlsplit(target)
+        path = parts.path
+
+        # Health probes (GET/HEAD on /health and /api/health) return static status
+        # and are answered before Host validation so that internal container probes
+        # (e.g. Render platform probes or loopback) succeed regardless of Host header.
+        if path in ("/health", "/api/health") and method in ("GET", "HEAD"):
+            return self._attach_cors(headers, Response(200, "application/json; charset=utf-8", b'{"status": "ok"}'))
+
         req_host = (headers.get("host") or "").strip().lower()
         if req_host not in self._allowed_hosts:
             msg = "This demo only answers on its own local address." if not self._remote else "Host not allowed."
             return self._attach_cors(headers, _json(403, {"error": msg}))
-        parts = urlsplit(target)
-        path = parts.path
 
         if path in ("/health", "/api/health"):
-            if method in ("GET", "HEAD"):
-                return self._attach_cors(headers, Response(200, "application/json; charset=utf-8", b'{"status": "ok"}'))
             return self._attach_cors(headers, Response(405, "application/json; charset=utf-8",
                                                         json.dumps({"error": "Method not allowed."}).encode("utf-8"),
                                                         allow="GET, HEAD"))

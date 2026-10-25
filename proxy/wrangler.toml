@@ -1,0 +1,21 @@
+name = "nelavi-auth-proxy"
+main = "worker.js"
+compatibility_date = "2024-10-01"
+
+[vars]
+# Public Render backend domain (UPSTREAM_URL)
+UPSTREAM_URL = "https://nelavi-backend.onrender.com"
+
+# Public Firebase Project ID (Matches your Firebase Console project)
+FIREBASE_PROJECT_ID = "nelavi-9c5f5"
+
+# Comma-separated list of exact allowed FlutterFlow web origins (no wildcards)
+ALLOWED_CORS_ORIGINS = "https://app.flutterflow.io,https://cropsync.flutterflow.app"
+
+# Upstream timeout in milliseconds (defaults to 55000 to safely accommodate Render cold starts; capped at 90000)
+UPSTREAM_TIMEOUT_MS = "55000"
+
+# SECRETS (Do NOT commit secret tokens here):
+# Set the backend bearer token in Cloudflare via the Wrangler CLI:
+#   npx wrangler secret put NELAVI_AUTH_TOKEN
+# Or add it in Cloudflare Dashboard -> Workers & Pages -> Settings -> Variables -> Secrets.
